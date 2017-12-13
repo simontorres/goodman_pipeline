@@ -10,13 +10,24 @@ https://github.com/pypa/sampleproject
 """
 
 # Always prefer setuptools over distutils
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
 
+import os
+import sys
+import subprocess
 # To use a consistent encoding
 from codecs import open
 from os import path
 
 here = path.abspath(path.dirname(__file__))
+
+# compile dcr
+os.chdir(os.path.join(here, 'goodman/dcr'))
+p = subprocess.Popen(["make"]).wait()
+if not os.path.isfile('dcr'):
+    sys.exit(0)
+
+os.chdir(here)
 
 VERSION = __import__('goodman').__version__
 
@@ -92,7 +103,9 @@ setup(
                               'data/params/*.json',
                               'data/ref_comp/*fits']},
 
-    scripts=['bin/redccd', 'bin/redspec'],
+    # ext_modules=[Extension("dcr", ["goodman/dcr/dcr.c"])],
+
+    scripts=['bin/redccd', 'bin/redspec', 'goodman/dcr/dcr'],
 
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
