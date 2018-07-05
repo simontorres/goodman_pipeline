@@ -30,7 +30,7 @@ class WCS(object):
         self.log = logging.getLogger(__name__)
         self.model_name = None
         self.degree = None
-        self.model = None
+        self._model = None
         self.model_fitter = None
         self.fitted_model = None
         # dispersion direction binning
@@ -107,7 +107,7 @@ class WCS(object):
             if ctypen == 'LINEAR':
                 self.log.info('Reading Linear Solution')
                 # self.wcs_dict = {'dtype': 0}
-                self.model = self._read_linear()
+                self._model = self._read_linear()
             elif ctypen == 'MULTISPE':
                 self._read_non_linear(dim)
             else:
@@ -187,12 +187,12 @@ class WCS(object):
         self._binning = int(ccd.header['CCDSUM'].split()[0])
 
         if self.model_name == 'Chebyshev1D':
-            self.model = models.Chebyshev1D(degree=self.degree)
+            self._model = models.Chebyshev1D(degree=self.degree)
             for i in range(ccd.header['GSP_ORDR'] + 1):
-                self.model.__getattr__('c{:d}'.format(i)).value = ccd.header[
+                self._model.__getattr__('c{:d}'.format(i)).value = ccd.header[
                     'GSP_C{:03d}'.format(i)]
             self.wavelength_and_intensity = [
-                self.model(range(ccd.header['GSP_NPIX'])), ccd.data]
+                self._model(range(ccd.header['GSP_NPIX'])), ccd.data]
 
             return self.wavelength_and_intensity
 
@@ -204,10 +204,10 @@ class WCS(object):
         results for Goodman data.
         """
         if self.model_name == 'chebyshev':
-            self.model = models.Chebyshev1D(degree=self.degree)
+            self._model = models.Chebyshev1D(degree=self.degree)
             self.model_fitter = fitting.LevMarLSQFitter()
         elif self.model_name == 'linear':
-            self.model = models.Linear1D()
+            self._model = models.Linear1D()
             self.model_fitter = fitting.LinearLSQFitter()
         else:
             raise NotImplementedError("The model {:s} is "
@@ -227,15 +227,15 @@ class WCS(object):
             fitted_model i.e. wavelength solution.
 
         """
-        if self.model and self.model_fitter is not None:
+        if self._model and self.model_fitter is not None:
             try:
 
-                fitted_model = self.model_fitter(self.model,
+                fitted_model = self.model_fitter(self._model,
                                                  physical,
                                                  wavelength)
                 return fitted_model
             except TypeError as error:
-                # print(physical, wavelength, self.model)
+                # print(physical, wavelength, self._model)
                 self.log.info('Unable to do fit, please add more data points.')
                 self.log.error('TypeError: %s', error)
                 return None
@@ -331,7 +331,7 @@ class WCS(object):
             # developed neither tested
 
             self._set_math_model()
-            self.wavelength_and_intensity = [self.model(range(self.wcs_dict['pnum'])),
+            self.wavelength_and_intensity = [self._model(range(self.wcs_dict['pnum'])),
                                              self.ccd.data]
             # plt.plot(self.wavelength_and_intensity[0],
             #          self.wavelength_and_intensity[1])
@@ -357,25 +357,25 @@ class WCS(object):
 
         x_axis = range(len(self.data))
 
-        self.wavelength_and_intensity = [self.model(x_axis), self.data]
+        self.wavelength_and_intensity = [self._model(x_axis), self.data]
 
-        return self.model
+        return self._model
 
     def _set_binning_in_model(self):
         """Modified the model so it matches binned data"""
 
         self.log.debug('"Binning" model')
-        if self.model.__class__.__name__ == 'Linear1D':
-            self.model.slope.value *= self._binning
-        elif self.model.__class__.__name__ in ['Chebyshev1D',
+        if self._model.__class__.__name__ == 'Linear1D':
+            self._model.slope.value *= self._binning
+        elif self._model.__class__.__name__ in ['Chebyshev1D',
                                                'Legendre1D']:
-            for par_index in range(len(self.model.parameters)):
-                parameter_name = self.model.param_names[par_index]
-                self.model.__getattr__(parameter_name).value *= \
+            for par_index in range(len(self._model.parameters)):
+                parameter_name = self._model.param_names[par_index]
+                self._model.__getattr__(parameter_name).value *= \
                     self.binning ** par_index
         else:
             raise NotImplementedError("Model {:s} not implemented"
-                                      "".format(self.model.__class__.__name__))
+                                      "".format(self._model.__class__.__name__))
 
 
     def _set_math_model(self):
@@ -429,7 +429,7 @@ class WCS(object):
             (self.wcs_dict['crpix'] - 1) *\
             self.wcs_dict['cdelt']
 
-        self.model = models.Linear1D(slope=self.wcs_dict['cdelt'],
+        self._model = models.Linear1D(slope=self.wcs_dict['cdelt'],
                                      intercept=intercept)
 
     def _log_linear(self):
@@ -444,31 +444,31 @@ class WCS(object):
         #
         # slope = np.power(10, self.wcs_dict['cdelt'])
         #
-        # self.model = models.Linear1D(slope=slope,
+        # self._model = models.Linear1D(slope=slope,
         #                              intercept=intercept)
-        # print(self.model)
+        # print(self._model)
         raise NotImplementedError
 
     def _chebyshev(self):
         """Returns a chebyshev model"""
-        self.model = models.Chebyshev1D(degree=self.wcs_dict['order'] - 1,
+        self._model = models.Chebyshev1D(degree=self.wcs_dict['order'] - 1,
                                         domain=[self.wcs_dict['pmin'],
                                                 self.wcs_dict['pmax']], )
-        # self.model.parameters[0] = self.wcs_dict['pmin']
+        # self._model.parameters[0] = self.wcs_dict['pmin']
         for param_index in range(self.wcs_dict['order']):
-            self.model.parameters[param_index] = self.wcs_dict['fpar'][
+            self._model.parameters[param_index] = self.wcs_dict['fpar'][
                 param_index]
 
     def _non_linear_legendre(self):
         """Set model to Legendre1D
         """
         """Returns a legendre model"""
-        self.model = models.Legendre1D(degree=self.wcs_dict['order'] - 1,
+        self._model = models.Legendre1D(degree=self.wcs_dict['order'] - 1,
                                        domain=[self.wcs_dict['pmin'],
                                                self.wcs_dict['pmax']], )
-        # self.model.parameters[0] = self.wcs_dict['pmin']
+        # self._model.parameters[0] = self.wcs_dict['pmin']
         for param_index in range(self.wcs_dict['order']):
-            self.model.parameters[param_index] = self.wcs_dict['fpar'][
+            self._model.parameters[param_index] = self.wcs_dict['fpar'][
                 param_index]
         # raise NotImplementedError
 
@@ -490,12 +490,14 @@ class WCS(object):
         """
         raise NotImplementedError('Cubic spline is not implemented')
 
-    def get_model(self):
+    @property
+    def model(self):
         """Returns the wavelength solution model if exists."""
-        if self.model is not None:
-            return self.model
+        if self._model is not None:
+            return self._model
         else:
             self.log.error("The solution hasn't been found")
+            return None
 
 
 if __name__ == '__main__':
