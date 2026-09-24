@@ -159,7 +159,7 @@ class WCS(object):
 
         ccd.header.set('GSP_FUNC',
                        value=model.__class__.name,
-                       comment="Mathematical model of non-linearized data",
+                       comment="Mathematical model used to build wavelength solution.",
                        after='GSP_WREJ')
         ccd.header.set('GSP_ORDR', value=model.degree,
                        comment="Mathematical model order",
